@@ -2,7 +2,7 @@
 name = "pysh"
 version = "0.1.0"
 description = "A minimal educational shell in Python"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
     "psutil>=7.2.2",
     "requests>=2.32.5",
