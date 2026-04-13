@@ -30,6 +30,8 @@ from pysh.builtins import (
     builtin_procinfo,
     builtin_pwd,
 )
+from pysh.files import builtin_cat, builtin_head, builtin_wc
+from pysh.system import builtin_sysinfo
 from pysh.colors import BLUE, GREEN, RESET
 
 
@@ -40,6 +42,10 @@ BUILTINS = {
     'help': builtin_help,
     'exit': builtin_exit,
     'procinfo': builtin_procinfo,
+    'cat': builtin_cat,
+    'head': builtin_head,
+    'wc': builtin_wc,
+    'sysinfo': builtin_sysinfo,
 }
 
 

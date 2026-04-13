@@ -91,6 +91,10 @@ Available built-in commands:
   help            Show this help message
   exit [code]     Exit the shell
   procinfo <pid>  Show process information (requires psutil)
+  cat <file>      Print file contents
+  head [-n N]     Print first N lines of file
+  wc <file>       Count lines, words, bytes in file
+  sysinfo         Show system info (CPU, memory, top processes)
 
 External commands are also available.
     """
