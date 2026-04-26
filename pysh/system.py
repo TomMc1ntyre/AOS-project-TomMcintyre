@@ -96,11 +96,13 @@ def builtin_sysinfo(args):
                 processes.sort(key=lambda x: x.get('memory_percent', 0) or 0, reverse=True)
 
             for proc in processes[:10]:
-                pid = proc.get('pid', 'N/A')
-                user = proc.get('username', 'N/A')[:14]
+                if not proc:
+                    continue
+                pid = proc.get('pid') or 'N/A'
+                user = (proc.get('username') or 'N/A')[:14]
                 cpu = proc.get('cpu_percent') or 0
                 mem = proc.get('memory_percent') or 0
-                name = proc.get('name', 'N/A')[:19]
+                name = (proc.get('name') or 'N/A')[:19]
                 print(f"{pid:<8} {user:<15} {cpu:<8.1f} {mem:<8.1f} {name:<20}")
 
             print()
