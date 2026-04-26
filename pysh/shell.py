@@ -32,6 +32,7 @@ from pysh.builtins import (
 )
 from pysh.files import builtin_cat, builtin_head, builtin_wc
 from pysh.system import builtin_sysinfo
+from pysh.download import builtin_download
 from pysh.colors import BLUE, GREEN, RESET
 
 
@@ -46,7 +47,29 @@ BUILTINS = {
     'head': builtin_head,
     'wc': builtin_wc,
     'sysinfo': builtin_sysinfo,
+    'download': builtin_download,
 }
+
+
+def _parse_redirects(args):
+    """
+    Scan args for > >> < redirect tokens and return them separately.
+    Returns (clean_args, out_file, append, in_file).
+    """
+    clean, out_file, in_file, append = [], None, None, False
+    i = 0
+    while i < len(args):
+        if args[i] in ('>', '>>') and i + 1 < len(args):
+            append = args[i] == '>>'
+            out_file = args[i + 1]
+            i += 2
+        elif args[i] == '<' and i + 1 < len(args):
+            in_file = args[i + 1]
+            i += 2
+        else:
+            clean.append(args[i])
+            i += 1
+    return clean, out_file, append, in_file
 
 
 def prompt():
@@ -82,32 +105,66 @@ def parse(line):
     return parts[0], parts[1:] if len(parts) > 1 else []
 
 
-def execute(command, args):
+def execute(command, args, background=False):
     """
     Execute a command with the given arguments.
 
     First checks if the command is a built-in. If not, tries to run it
     as an external program using subprocess (without shell=True).
+    Supports I/O redirection (> >> <) and background execution (&).
     """
     if not command:
         return 0
-    
+
+    args, out_file, append, in_file = _parse_redirects(args)
+
     if command in BUILTINS:
-        return BUILTINS[command](args)
-    
+        old_stdout, old_stdin = sys.stdout, sys.stdin
+        try:
+            if out_file:
+                sys.stdout = open(out_file, 'a' if append else 'w')
+            if in_file:
+                sys.stdin = open(in_file, 'r')
+            return BUILTINS[command](args)
+        finally:
+            if out_file and sys.stdout is not old_stdout:
+                sys.stdout.close()
+                sys.stdout = old_stdout
+            if in_file and sys.stdin is not old_stdin:
+                sys.stdin.close()
+                sys.stdin = old_stdin
+
+    stdout_fd = None
+    stdin_fd = None
     try:
+        if out_file:
+            stdout_fd = open(out_file, 'a' if append else 'w')
+        if in_file:
+            stdin_fd = open(in_file, 'r')
+
+        if background:
+            proc = subprocess.Popen(
+                [command] + args,
+                stdout=stdout_fd or subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=stdin_fd or subprocess.DEVNULL,
+            )
+            print(f"[{proc.pid}] {command}")
+            return 0
+
         result = subprocess.run(
             [command] + args,
-            stdout=subprocess.PIPE,
+            stdout=stdout_fd or subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            stdin=stdin_fd,
+            text=True,
         )
-        if result.stdout:
+        if stdout_fd is None and result.stdout:
             print(result.stdout, end='')
         if result.stderr:
             print(result.stderr, end='', file=sys.stderr)
         return result.returncode
-        
+
     except FileNotFoundError:
         print(f"pysh: {command}: command not found", file=sys.stderr)
         return 127
@@ -117,6 +174,11 @@ def execute(command, args):
     except Exception as e:
         print(f"pysh: {command}: {e}", file=sys.stderr)
         return 1
+    finally:
+        if stdout_fd:
+            stdout_fd.close()
+        if stdin_fd:
+            stdin_fd.close()
 
 
 def main():
@@ -139,12 +201,18 @@ def main():
         try:
             line = input(prompt())
 
+            # Detect trailing & for background execution
+            background = False
+            if line.rstrip().endswith('&'):
+                background = True
+                line = line.rstrip()[:-1]
+
             command, args = parse(line)
 
             if command is None:
                 continue
 
-            execute(command, args)
+            execute(command, args, background=background)
 
         except EOFError:
             print("\nGoodbye!")
